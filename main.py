@@ -8,44 +8,83 @@ pokedex = {
     1: {
         "nombre": "Bulbasaur",
         "tipo": ["Planta", "Veneno"],
-        "habilidad": "Látigo Cepa Supremo",
         "nivel": 5,
-        "movimientos": [
-            "Látigo Cepa",
-            "Drenadoras",
-            "Hoja Afilada",
-            "Bomba Germen"
-        ],
+        "habilidad": "Látigo Cepa Supremo",
+        "movimientos": ["Placaje", "Drenadoras", "Látigo Cepa", "Hoja Afilada"],
         "ataque": 49,
         "defensa": 49
+    },
+    2: {
+        "nombre": "Ivysaur",
+        "tipo": ["Planta", "Veneno"],
+        "nivel": 16,
+        "habilidad": "Bosque Viviente",
+        "movimientos": ["Hoja Afilada", "Drenadoras", "Síntesis", "Placaje"],
+        "ataque": 62,
+        "defensa": 63
+    },
+    3: {
+        "nombre": "Venusaur",
+        "tipo": ["Planta", "Veneno"],
+        "nivel": 32,
+        "habilidad": "Furia Floral",
+        "movimientos": ["Rayo Solar", "Gigadrenado", "Terremoto", "Bomba Germen"],
+        "ataque": 82,
+        "defensa": 83
     },
     4: {
         "nombre": "Charmander",
         "tipo": ["Fuego"],
-        "habilidad": "Infierno Dragón",
         "nivel": 5,
-        "movimientos": [
-            "Ascuas",
-            "Lanzallamas",
-            "Garra Dragón",
-            "Giro Fuego"
-        ],
+        "habilidad": "Infierno Dragón",
+        "movimientos": ["Ascuas", "Arañazo", "Gruñido", "Giro Fuego"],
         "ataque": 52,
         "defensa": 43
+    },
+    5: {
+        "nombre": "Charmeleon",
+        "tipo": ["Fuego"],
+        "nivel": 16,
+        "habilidad": "Llama Carmesí",
+        "movimientos": ["Lanzallamas", "Arañazo", "Colmillo Ígneo", "Garra Metal"],
+        "ataque": 64,
+        "defensa": 58
+    },
+    6: {
+        "nombre": "Charizard",
+        "tipo": ["Fuego", "Volador"],
+        "nivel": 32,
+        "habilidad": "Tormenta Ígnea",
+        "movimientos": ["Lanzallamas", "Vuelo", "Garra Dragón", "Anillo Ígneo"],
+        "ataque": 84,
+        "defensa": 78
     },
     7: {
         "nombre": "Squirtle",
         "tipo": ["Agua"],
-        "habilidad": "Tsunami Destructor",
         "nivel": 5,
-        "movimientos": [
-            "Pistola Agua",
-            "Hidrobomba",
-            "Burbuja",
-            "Acua Cola"
-        ],
+        "habilidad": "Tsunami Destructor",
+        "movimientos": ["Pistola Agua", "Burbuja", "Placaje", "Acua Cola"],
         "ataque": 48,
         "defensa": 65
+    },
+    8: {
+        "nombre": "Wartortle",
+        "tipo": ["Agua"],
+        "nivel": 16,
+        "habilidad": "Marea Ancestral",
+        "movimientos": ["Hidrobomba", "Acua Cola", "Protección", "Burbuja"],
+        "ataque": 63,
+        "defensa": 80
+    },
+    9: {
+        "nombre": "Blastoise",
+        "tipo": ["Agua"],
+        "nivel": 32,
+        "habilidad": "Cañón Oceánico",
+        "movimientos": ["Hidrobomba", "Surf", "Rayo Hielo", "Acua Cola"],
+        "ataque": 83,
+        "defensa": 100
     }
 }
 
@@ -77,13 +116,6 @@ def leer_raiz():
         "mensaje": "¡Bienvenido a la PokéDex API de David Morales! Soy estudiante de Desarrollo de Software y mi Pokémon favorito es Charizard."
     }
 
-
-# Obtener todos los Pokémon
-@app.get("/pokemons")
-def obtener_todos():
-    return pokedex
-
-
 # Buscar Pokémon por ID (Path Parameter)
 @app.get("/pokemons/{pokemon_id}")
 def obtener_por_id(pokemon_id: int):
@@ -98,50 +130,84 @@ def obtener_por_id(pokemon_id: int):
 
 
 # Buscar Pokémon por tipo y/o habilidad (Query Parameters)
-@app.get("/pokemons/")
+@app.get("/pokemons")
 def obtener_todos_los_pokemon(
         tipo: str = None,
-        habilidad: str = None):
+        habilidad: str = None,
+        limit: int = 5,
+        offset: int = 0):
 
-    if tipo is None and habilidad is None:
-        return pokedex
+    resultados = pokedex
 
-    pokemon_filtrados = {}
-
-    for pokemon_id, datos in pokedex.items():
-
-        cumple_tipo = True
-        cumple_habilidad = True
-
-        if tipo is not None:
-            cumple_tipo = tipo.capitalize() in datos["tipo"]
-
-        if habilidad is not None:
-            cumple_habilidad = habilidad.lower() in datos["habilidad"].lower()
-
-        if cumple_tipo and cumple_habilidad:
-            pokemon_filtrados[pokemon_id] = datos
-
-    if len(pokemon_filtrados) > 0:
-        return pokemon_filtrados
-
-    if tipo is not None and habilidad is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No existe ningún Pokémon del tipo {tipo} en la PokéDex."
+    if tipo:
+        tipo_existe = any(
+            tipo.capitalize() in p["tipo"]
+            for p in pokedex.values()
         )
 
-    if tipo is None and habilidad is not None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No existe ningún Pokémon con la habilidad {habilidad} en la PokéDex."
+        if not tipo_existe:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No existe ningún Pokémon de tipo {tipo.capitalize()} en la PokéDex..."
+            )
+
+        resultados = {
+            pokemon_id: p
+            for pokemon_id, p in resultados.items()
+            if tipo.capitalize() in p["tipo"]
+        }
+
+    if habilidad:
+        hab_existe = any(
+            habilidad.lower() == p["habilidad"].lower()
+            for p in pokedex.values()
         )
 
-    raise HTTPException(
-        status_code=404,
-        detail=f"No existe ningún Pokémon de tipo {tipo} con la habilidad {habilidad} en la PokéDex."
+        if not hab_existe:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No existe ningún Pokémon con la habilidad '{habilidad}' en la PokéDex..."
+            )
+
+        resultados = {
+            pokemon_id: p
+            for pokemon_id, p in resultados.items()
+            if habilidad.lower() == p["habilidad"].lower()
+        }
+
+    if not resultados:
+
+        mensaje_error = "No se encontraron Pokémon"
+
+        if tipo:
+            mensaje_error += f" de tipo {tipo.capitalize()}"
+
+        if habilidad:
+            mensaje_error += f" con la habilidad '{habilidad}'"
+
+        raise HTTPException(
+            status_code=404,
+            detail=f"{mensaje_error} en la PokéDex..."
+        )
+
+    # --- Capa 2: Paginación ---
+    # Convertimos el diccionario en una lista para poder seccionarla.
+
+    pokedex_en_lista = list(resultados.items())
+
+    # Aplicar el Slicing y volvemos a empaquetar como diccionario
+    resultados_paginados = dict(
+        pokedex_en_lista[offset: offset + limit]
     )
 
+    # Devolvemos los metadatos y la información final
+
+    return {
+        "total_coincidencias": len(resultados),
+        "limite_pagina": limit,
+        "desplazamiento": offset,
+        "resultados": resultados_paginados
+    }
 
 # Endpoint para par REGISTRAR un nuevo pokemon
 @app.post("/pokemon/{pokemon_id}", status_code=status.HTTP_201_CREATED)
