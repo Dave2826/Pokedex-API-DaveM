@@ -116,6 +116,40 @@ def leer_raiz():
         "mensaje": "¡Bienvenido a la PokéDex API de David Morales! Soy estudiante de Desarrollo de Software y mi Pokémon favorito es Charizard."
     }
 
+# Catálogo paginado de Pokémon (page y size)
+@app.get("/pokemons/catalogo")
+def catalogo_pokemon(page: int = 1, size: int = 5):
+
+    # Validar parámetros de paginación
+    if page <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="El parámetro 'page' debe ser mayor o igual a 1."
+        )
+
+    if size <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="El parámetro 'size' debe ser mayor o igual a 1."
+        )
+
+    # Convertir el diccionario en una lista para aplicar slicing
+    pokedex_en_lista = list(pokedex.items())
+
+    # Calcular offset
+    offset = (page - 1) * size
+
+    # Aplicar slicing y volver a empaquetar como diccionario
+    resultados_paginados = dict(
+        pokedex_en_lista[offset: offset + size]
+    )
+
+    return {
+        "pagina_actual": page,
+        "tamano_pagina": size,
+        "resultado": resultados_paginados
+    }
+
 # Buscar Pokémon por ID (Path Parameter)
 @app.get("/pokemons/{pokemon_id}")
 def obtener_por_id(pokemon_id: int):
