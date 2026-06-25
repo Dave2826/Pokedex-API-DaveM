@@ -1,95 +1,49 @@
+import os
+import json
+
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 from typing import List
 
 app = FastAPI(title="PokéDex API de David Morales")
 
-pokedex = {
-    1: {
-        "nombre": "Bulbasaur",
-        "tipo": ["Planta", "Veneno"],
-        "nivel": 5,
-        "habilidad": "Látigo Cepa Supremo",
-        "movimientos": ["Placaje", "Drenadoras", "Látigo Cepa", "Hoja Afilada"],
-        "ataque": 49,
-        "defensa": 49
-    },
-    2: {
-        "nombre": "Ivysaur",
-        "tipo": ["Planta", "Veneno"],
-        "nivel": 16,
-        "habilidad": "Bosque Viviente",
-        "movimientos": ["Hoja Afilada", "Drenadoras", "Síntesis", "Placaje"],
-        "ataque": 62,
-        "defensa": 63
-    },
-    3: {
-        "nombre": "Venusaur",
-        "tipo": ["Planta", "Veneno"],
-        "nivel": 32,
-        "habilidad": "Furia Floral",
-        "movimientos": ["Rayo Solar", "Gigadrenado", "Terremoto", "Bomba Germen"],
-        "ataque": 82,
-        "defensa": 83
-    },
-    4: {
-        "nombre": "Charmander",
-        "tipo": ["Fuego"],
-        "nivel": 5,
-        "habilidad": "Infierno Dragón",
-        "movimientos": ["Ascuas", "Arañazo", "Gruñido", "Giro Fuego"],
-        "ataque": 52,
-        "defensa": 43
-    },
-    5: {
-        "nombre": "Charmeleon",
-        "tipo": ["Fuego"],
-        "nivel": 16,
-        "habilidad": "Llama Carmesí",
-        "movimientos": ["Lanzallamas", "Arañazo", "Colmillo Ígneo", "Garra Metal"],
-        "ataque": 64,
-        "defensa": 58
-    },
-    6: {
-        "nombre": "Charizard",
-        "tipo": ["Fuego", "Volador"],
-        "nivel": 32,
-        "habilidad": "Tormenta Ígnea",
-        "movimientos": ["Lanzallamas", "Vuelo", "Garra Dragón", "Anillo Ígneo"],
-        "ataque": 84,
-        "defensa": 78
-    },
-    7: {
-        "nombre": "Squirtle",
-        "tipo": ["Agua"],
-        "nivel": 5,
-        "habilidad": "Tsunami Destructor",
-        "movimientos": ["Pistola Agua", "Burbuja", "Placaje", "Acua Cola"],
-        "ataque": 48,
-        "defensa": 65
-    },
-    8: {
-        "nombre": "Wartortle",
-        "tipo": ["Agua"],
-        "nivel": 16,
-        "habilidad": "Marea Ancestral",
-        "movimientos": ["Hidrobomba", "Acua Cola", "Protección", "Burbuja"],
-        "ataque": 63,
-        "defensa": 80
-    },
-    9: {
-        "nombre": "Blastoise",
-        "tipo": ["Agua"],
-        "nivel": 32,
-        "habilidad": "Cañón Oceánico",
-        "movimientos": ["Hidrobomba", "Surf", "Rayo Hielo", "Acua Cola"],
-        "ataque": 83,
-        "defensa": 100
-    }
-}
+ARCHIVO_DB = "pokedex.json"
+
+
+# Función 1: Leer el archivo JSON y cargarlo a la RAM
+def cargar_pokedex() -> dict:
+    """Devuelve la PokéDex completa en un diccionario de Python"""
+
+    # Si el archivo no existe, devolvemos un diccionario vacío
+    if not os.path.exists(ARCHIVO_DB):
+        return {}
+
+    # Guardián y Portal para abrir un archivo del disco duro
+    with open(ARCHIVO_DB, "r", encoding="utf-8") as f:
+        datos_texto = json.load(f)
+
+        # Conversión de seguridad:
+        # JSON convierte los IDs a str ("1", "2"...)
+        # Los regresamos a int (1,2...) para mantener compatibilidad
+        return {int(k): v for k, v in datos_texto.items()}
+
+
+# Función 2: Tomar los cambios de la RAM y guardarlos en el JSON del disco duro
+def guardar_pokedex(pokedex_actualizada: dict):
+    """Almacena el diccionario de Python en un archivo JSON"""
+
+    # Guardián y Portal para abrir un archivo en el disco duro
+    with open(ARCHIVO_DB, "w", encoding="utf-8") as f:
+        json.dump(
+            pokedex_actualizada,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
 
 
 class Pokemon(BaseModel):
+    id: int
     nombre: str
     tipo: List[str]
     nivel: int
@@ -109,12 +63,17 @@ class PokemonParcial(BaseModel):
     defensa: int | None = None
 
 
+# Cargar automáticamente la PokéDex desde el JSON
+pokedex = cargar_pokedex()
+
+
 # Endpoint raíz
 @app.get("/")
 def leer_raiz():
     return {
         "mensaje": "¡Bienvenido a la PokéDex API de David Morales! Soy estudiante de Desarrollo de Software y mi Pokémon favorito es Charizard."
     }
+
 
 # Catálogo paginado de Pokémon (page y size)
 @app.get("/pokemons/catalogo")
@@ -124,22 +83,21 @@ def catalogo_pokemon(page: int = 1, size: int = 5):
     if page <= 0:
         raise HTTPException(
             status_code=400,
-            detail="El parámetro 'page' debe ser mayor o igual a 1."
+            detail="El parámetro 'page' debe ser mayor a cero."
         )
 
     if size <= 0:
         raise HTTPException(
             status_code=400,
-            detail="El parámetro 'size' debe ser mayor o igual a 1."
+            detail="El parámetro 'size' debe ser mayor a cero."
         )
 
-    # Convertir el diccionario en una lista para aplicar slicing
+    pokedex = cargar_pokedex()
+
     pokedex_en_lista = list(pokedex.items())
 
-    # Calcular offset
     offset = (page - 1) * size
 
-    # Aplicar slicing y volver a empaquetar como diccionario
     resultados_paginados = dict(
         pokedex_en_lista[offset: offset + size]
     )
@@ -150,9 +108,12 @@ def catalogo_pokemon(page: int = 1, size: int = 5):
         "resultado": resultados_paginados
     }
 
+
 # Buscar Pokémon por ID (Path Parameter)
 @app.get("/pokemons/{pokemon_id}")
 def obtener_por_id(pokemon_id: int):
+
+    pokedex = cargar_pokedex()
 
     if pokemon_id not in pokedex:
         raise HTTPException(
@@ -170,6 +131,8 @@ def obtener_todos_los_pokemon(
         habilidad: str = None,
         limit: int = 5,
         offset: int = 0):
+
+    pokedex = cargar_pokedex()
 
     resultados = pokedex
 
@@ -235,7 +198,6 @@ def obtener_todos_los_pokemon(
     )
 
     # Devolvemos los metadatos y la información final
-
     return {
         "total_coincidencias": len(resultados),
         "limite_pagina": limit,
@@ -247,25 +209,31 @@ def obtener_todos_los_pokemon(
 @app.post("/pokemon/{pokemon_id}", status_code=status.HTTP_201_CREATED)
 def registrar_nuevo_pokemon(pokemon_id: int, nuevo_pokemon: Pokemon):
 
+    pokedex = cargar_pokedex()
+
     # Verificar si ya existe
-    if pokemon_id in pokedex:
+    if nuevo_pokemon.id in pokedex:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Ya existe un Pokémon con el ID #{pokemon_id}. Se trata de {pokedex[pokemon_id]['nombre']}"
+            detail=f"Ya existe un Pokémon con el ID #{nuevo_pokemon.id}. Se trata de {pokedex[nuevo_pokemon.id]['nombre']}"
         )
 
     # Registrar Pokémon nuevo
-    pokedex[pokemon_id] = nuevo_pokemon.model_dump()
+    pokedex[nuevo_pokemon.id] = nuevo_pokemon.model_dump()
+
+    guardar_pokedex(pokedex)
 
     return {
-        "mensaje": f"¡Ya está! Nuevo Pokémon registrado: {nuevo_pokemon.nombre} con el ID #{pokemon_id}",
-        "datos": pokedex[pokemon_id]
+        "mensaje": f"¡Ya está! Nuevo Pokémon registrado: {nuevo_pokemon.nombre} con el ID #{nuevo_pokemon.id}",
+        "datos": pokedex[nuevo_pokemon.id]
     }
 
 
 # Endpoint para actualizar un Pokemon por Completo (Reemplazo total)
 @app.put("/pokemon/{pokemon_id}")
 def actualizar_pokemon_completo(pokemon_id: int, pokemon_actualizado: Pokemon):
+
+    pokedex = cargar_pokedex()
 
     # Validar que el pokemon existe en la Pokedex
     if pokemon_id not in pokedex:
@@ -277,6 +245,8 @@ def actualizar_pokemon_completo(pokemon_id: int, pokemon_actualizado: Pokemon):
     # 2. Reemplazar los datos viejos con el JSON nuevo completo
     pokedex[pokemon_id] = pokemon_actualizado.model_dump()
 
+    guardar_pokedex(pokedex)
+
     # 3. Devolver mensaje de actualizacion.
     return {
         "mensaje": "Reemplazo total exitoso",
@@ -287,6 +257,8 @@ def actualizar_pokemon_completo(pokemon_id: int, pokemon_actualizado: Pokemon):
 # Endpoint para actualizar un Pokemon PARCIALMENTE
 @app.patch("/pokemon/{pokemon_id}")
 def actualizar_pokemon_parcial(pokemon_id: int, pokemon_parcial: PokemonParcial):
+
+    pokedex = cargar_pokedex()
 
     # 1.Validar que el Pokemon exista en la Pokedex
     if pokemon_id not in pokedex:
@@ -303,6 +275,8 @@ def actualizar_pokemon_parcial(pokemon_id: int, pokemon_parcial: PokemonParcial)
     for llave, valor in datos_a_actualizar.items():
         pokedex[pokemon_id][llave] = valor
 
+    guardar_pokedex(pokedex)
+
     return {
         "mensaje": "Actualizacion parcial completada",
         "datos": pokedex[pokemon_id]
@@ -312,6 +286,8 @@ def actualizar_pokemon_parcial(pokemon_id: int, pokemon_parcial: PokemonParcial)
 # Edpoint para LIBERAR (eliminar) un Pokemon de la Pokedex
 @app.delete("/pokemons/{pokemon_id}")
 def liberar_pokemon(pokemon_id: int):
+
+    pokedex = cargar_pokedex()
 
     # 1. Validar que el Pokemon exista en la Pokedex
     if pokemon_id not in pokedex:
@@ -330,6 +306,8 @@ def liberar_pokemon(pokemon_id: int):
 
     # 2. Extraer y borrar el pokemon de la pokedex usando .pop()
     pokemon_liberado = pokedex.pop(pokemon_id)
+
+    guardar_pokedex(pokedex)
 
     nombre = pokemon_liberado["nombre"]
 
