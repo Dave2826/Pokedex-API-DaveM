@@ -124,7 +124,7 @@ def obtener_por_id(pokemon_id: int):
             detail=f"¡El Pokémon con el ID #{pokemon_id} no existe en la región!"
         )
 
-    return pokedex[pokemon_id]
+    return pokedex_local[pokemon_id]
 
 
 # Buscar Pokémon por tipo y/o habilidad (Query Parameters)
@@ -228,9 +228,10 @@ def registrar_nuevo_pokemon(nuevo_pokemon: Pokemon, x_api_key: Optional[str] = H
     if nuevo_pokemon.id in pokedex_local:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Ya existe un Pokémon con el ID #{nuevo_pokemon.id}. Se trata de {pokedex[nuevo_pokemon.id]['nombre']}"
+            detail=f"Ya existe un Pokémon con el ID #{nuevo_pokemon.id}. Se trata de {pokedex_local[nuevo_pokemon.id]['nombre']}"
         )
 
+    # Registrar Pokémon nuevo
     # Registrar Pokémon nuevo
     pokedex_local[nuevo_pokemon.id] = nuevo_pokemon.model_dump()
 
@@ -245,7 +246,7 @@ def registrar_nuevo_pokemon(nuevo_pokemon: Pokemon, x_api_key: Optional[str] = H
 @app.put("/pokemon/{pokemon_id}")
 def actualizar_pokemon_completo(pokemon_id: int, pokemon_actualizado: Pokemon):
 
-    pokedex = cargar_pokedex()
+    pokedex_local = cargar_pokedex()
 
     # Validar que el pokemon existe en la Pokedex
     if pokemon_id not in pokedex_local:
@@ -255,14 +256,14 @@ def actualizar_pokemon_completo(pokemon_id: int, pokemon_actualizado: Pokemon):
         )
 
     # 2. Reemplazar los datos viejos con el JSON nuevo completo
-    pokedex[pokemon_id] = pokemon_actualizado.model_dump()
+    pokedex_local[pokemon_id] = pokemon_actualizado.model_dump()
 
     guardar_pokedex(pokedex_local)
 
     # 3. Devolver mensaje de actualizacion.
     return {
         "mensaje": "Reemplazo total exitoso",
-        "datos": pokedex[pokemon_id]
+        "datos": pokedex_local[pokemon_id]
     }
 
 
@@ -270,10 +271,10 @@ def actualizar_pokemon_completo(pokemon_id: int, pokemon_actualizado: Pokemon):
 @app.patch("/pokemon/{pokemon_id}")
 def actualizar_pokemon_parcial(pokemon_id: int, pokemon_parcial: PokemonParcial):
 
-    pokedex = cargar_pokedex()
+    pokedex_local = cargar_pokedex()
 
     # 1.Validar que el Pokemon exista en la Pokedex
-    if pokemon_id not in pokedex:
+    if pokemon_id not in pokedex_local:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"¡No existe ningún Pokémon con el ID #{pokemon_id}!"
@@ -285,13 +286,13 @@ def actualizar_pokemon_parcial(pokemon_id: int, pokemon_parcial: PokemonParcial)
 
     # 3. Actualizar solo las llaves que llegaron a actualizarse
     for llave, valor in datos_a_actualizar.items():
-        pokedex[pokemon_id][llave] = valor
+        pokedex_local[pokemon_id][llave] = valor
 
-    guardar_pokedex(pokedex)
+    guardar_pokedex(pokedex_local)
 
     return {
         "mensaje": "Actualizacion parcial completada",
-        "datos": pokedex[pokemon_id]
+        "datos": pokedex_local[pokemon_id]
     }
 
 
