@@ -1,13 +1,16 @@
 import os
 import json
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status,  Header
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 app = FastAPI(title="PokéDex API de David Morales")
 
 ARCHIVO_DB = "pokedex.json"
+
+#Definimos la contraseña  secreta
+CLAVE_SECRETA = "Viper123654"
 
 
 # Función 1: Leer el archivo JSON y cargarlo a la RAM
@@ -108,14 +111,14 @@ def catalogo_pokemon(page: int = 1, size: int = 5):
         "resultado": resultados_paginados
     }
 
-
+#Ejemplo de Path parameter
 # Buscar Pokémon por ID (Path Parameter)
 @app.get("/pokemons/{pokemon_id}")
 def obtener_por_id(pokemon_id: int):
+    #1 Cargar los datos reales del disco duro a la ram
+    pokedex_local= cargar_pokedex()
 
-    pokedex = cargar_pokedex()
-
-    if pokemon_id not in pokedex:
+    if pokemon_id not in pokedex_local:
         raise HTTPException(
             status_code=404,
             detail=f"¡El Pokémon con el ID #{pokemon_id} no existe en la región!"
@@ -207,27 +210,36 @@ def obtener_todos_los_pokemon(
 
 # Endpoint para par REGISTRAR un nuevo pokemon
 @app.post("/pokemon/{pokemon_id}", status_code=status.HTTP_201_CREATED)
-def registrar_nuevo_pokemon(pokemon_id: int, nuevo_pokemon: Pokemon):
+def registrar_nuevo_pokemon(nuevo_pokemon: Pokemon, x_api_key: Optional[str] = Header(None)):
 
-    pokedex = cargar_pokedex()
 
+
+    #1 Validar seguridad.
+    if x_api_key != CLAVE_SECRETA:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Acceso denegado para registrar nuevo pokemon"
+        )
+    #2 Cargamso la data actual de archivo
+    pokedex_local = cargar_pokedex()
+
+# 3 Extraemos el ID real que el usuario mando en el JSON
     # Verificar si ya existe
-    if nuevo_pokemon.id in pokedex:
+    if nuevo_pokemon.id in pokedex_local:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Ya existe un Pokémon con el ID #{nuevo_pokemon.id}. Se trata de {pokedex[nuevo_pokemon.id]['nombre']}"
         )
 
     # Registrar Pokémon nuevo
-    pokedex[nuevo_pokemon.id] = nuevo_pokemon.model_dump()
+    pokedex_local[nuevo_pokemon.id] = nuevo_pokemon.model_dump()
 
-    guardar_pokedex(pokedex)
+    guardar_pokedex(pokedex_local)
 
     return {
         "mensaje": f"¡Ya está! Nuevo Pokémon registrado: {nuevo_pokemon.nombre} con el ID #{nuevo_pokemon.id}",
-        "datos": pokedex[nuevo_pokemon.id]
+        "datos": pokedex_local[nuevo_pokemon.id]
     }
-
 
 # Endpoint para actualizar un Pokemon por Completo (Reemplazo total)
 @app.put("/pokemon/{pokemon_id}")
@@ -236,7 +248,7 @@ def actualizar_pokemon_completo(pokemon_id: int, pokemon_actualizado: Pokemon):
     pokedex = cargar_pokedex()
 
     # Validar que el pokemon existe en la Pokedex
-    if pokemon_id not in pokedex:
+    if pokemon_id not in pokedex_local:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"¡No existe ningún Pokémon con el ID #{pokemon_id}!"
@@ -245,7 +257,7 @@ def actualizar_pokemon_completo(pokemon_id: int, pokemon_actualizado: Pokemon):
     # 2. Reemplazar los datos viejos con el JSON nuevo completo
     pokedex[pokemon_id] = pokemon_actualizado.model_dump()
 
-    guardar_pokedex(pokedex)
+    guardar_pokedex(pokedex_local)
 
     # 3. Devolver mensaje de actualizacion.
     return {
@@ -285,12 +297,19 @@ def actualizar_pokemon_parcial(pokemon_id: int, pokemon_parcial: PokemonParcial)
 
 # Edpoint para LIBERAR (eliminar) un Pokemon de la Pokedex
 @app.delete("/pokemons/{pokemon_id}")
-def liberar_pokemon(pokemon_id: int):
+def liberar_pokemon(pokemon_id: int, x_api_key: Optional[str] = Header(None)):
 
-    pokedex = cargar_pokedex()
+    # Validar seguridad
+    if x_api_key != CLAVE_SECRETA:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Acceso denegado para liberar pokemon"
+        )
+
+    pokedex_local = cargar_pokedex()
 
     # 1. Validar que el Pokemon exista en la Pokedex
-    if pokemon_id not in pokedex:
+    if pokemon_id not in pokedex_local:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"¡No existe ningún Pokémon con el ID #{pokemon_id}!"
@@ -305,9 +324,9 @@ def liberar_pokemon(pokemon_id: int):
         )
 
     # 2. Extraer y borrar el pokemon de la pokedex usando .pop()
-    pokemon_liberado = pokedex.pop(pokemon_id)
+    pokemon_liberado = pokedex_local.pop(pokemon_id)
 
-    guardar_pokedex(pokedex)
+    guardar_pokedex(pokedex_local)
 
     nombre = pokemon_liberado["nombre"]
 

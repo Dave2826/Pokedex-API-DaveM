@@ -1,0 +1,16 @@
+{
+    "0": {
+        "id": 0,
+        "nombre": "string",
+        "tipo": [
+            "string"
+        ],
+        "nivel": 0,
+        "habilidad": "string",
+        "movimientos": [
+            "string"
+        ],
+        "ataque": 0,
+        "defensa": 0
+    }
+}
